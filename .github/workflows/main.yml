@@ -20,5 +20,4 @@ jobs:
       - name: Publish
         env:
           CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
-        working-directory: some_dir/some_subdir
         run: npm i @cloudflare/wrangler && npx wrangler publish --env production
