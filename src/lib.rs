@@ -1,3 +1,4 @@
+use transformer::transform;
 use worker::*;
 
 mod transformer;
@@ -11,6 +12,10 @@ fn log_request(req: &Request) {
         req.cf().coordinates().unwrap_or_default(),
         req.cf().region().unwrap_or_else(|| "unknown region".into())
     );
+}
+
+async fn fetch(url: Url) -> Result<String> {
+    Fetch::Url(url).send().await?.text().await
 }
 
 #[event(fetch)]
@@ -32,11 +37,14 @@ pub async fn main(req: Request, env: Env, _ctx: worker::Context) -> Result<Respo
         .get("/", |_, _| Response::ok("Hello from Workers!"))
         .get_async("/transform/:url", |_req, ctx| async move {
             if let Some(encoded) = ctx.param("url") {
-                let url = String::from_utf8(
-                    base64::decode(encoded).map_err(|e| worker::Error::RustError(e.to_string()))?,
-                )
-                .map_err(|e| worker::Error::RustError(e.to_string()))?;
-                return Response::error(url, 400);
+                let url = Url::parse(
+                    std::str::from_utf8(
+                        &base64::decode(encoded)
+                            .map_err(|e| worker::Error::RustError(e.to_string()))?,
+                    )
+                    .map_err(|e| worker::Error::RustError(e.to_string()))?,
+                )?;
+                return Response::ok(transform(fetch(url).await?)?);
             }
 
             Response::error("Bad Request", 400)
@@ -44,8 +52,10 @@ pub async fn main(req: Request, env: Env, _ctx: worker::Context) -> Result<Respo
         // https://ucilnica.fri.uni-lj.si/calendar/export_execute.php?userid=69696&authtoken=longtokendata&preset_what=all&preset_time=custom
         .get_async("/fri", |req, _ctx| async move {
             if let Some(q) = req.url()?.query() {
-                let url = format!("https://ucilnica.fri.uni-lj.si/calendar/export_execute.php?{q}");
-                return Response::error(url, 400);
+                let url = Url::parse(&format!(
+                    "https://ucilnica.fri.uni-lj.si/calendar/export_execute.php?{q}"
+                ))?;
+                return Response::ok(transform(fetch(url).await?)?);
             }
 
             Response::error("Bad Request", 400)
