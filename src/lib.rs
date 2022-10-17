@@ -1,4 +1,5 @@
 use transformer::transform;
+
 use worker::*;
 
 mod transformer;
@@ -16,6 +17,16 @@ fn log_request(req: &Request) {
 
 async fn fetch(url: Url) -> Result<String> {
     Fetch::Url(url).send().await?.text().await
+}
+
+async fn response(url: Url) -> Result<Response> {
+    let mut headers = Headers::new();
+    headers.set("content-type", "text/calendar")?;
+
+    Ok(Response::from_body(ResponseBody::Body(
+        transform(fetch(url).await?)?.into_bytes(),
+    ))?
+    .with_headers(headers))
 }
 
 #[event(fetch)]
@@ -44,7 +55,8 @@ pub async fn main(req: Request, env: Env, _ctx: worker::Context) -> Result<Respo
                     )
                     .map_err(|e| worker::Error::RustError(e.to_string()))?,
                 )?;
-                return Response::ok(transform(fetch(url).await?)?);
+
+                return response(url).await;
             }
 
             Response::error("Bad Request", 400)
@@ -55,7 +67,8 @@ pub async fn main(req: Request, env: Env, _ctx: worker::Context) -> Result<Respo
                 let url = Url::parse(&format!(
                     "https://ucilnica.fri.uni-lj.si/calendar/export_execute.php?{q}"
                 ))?;
-                return Response::ok(transform(fetch(url).await?)?);
+
+                return response(url).await;
             }
 
             Response::error("Bad Request", 400)
