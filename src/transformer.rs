@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use icalendar::{Calendar, Component, Event};
+use icalendar::{Calendar, Component};
 
 /*
 pozor Obseg po meri (12/10/22 – 17/10/23) ne vsebuje določenih openerjev
