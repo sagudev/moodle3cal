@@ -1,7 +1,10 @@
 use std::collections::HashSet;
+use std::ops::Deref;
 use std::str::FromStr;
 
-use icalendar::{Calendar, CalendarComponent, CalendarDateTime, Component, DatePerhapsTime};
+use icalendar::{
+    Calendar, CalendarComponent, CalendarDateTime, Component, DatePerhapsTime, Event, Todo,
+};
 
 /*
 pozor Obseg po meri (12/10/22 – 17/10/23) ne vsebuje določenih openerjev
@@ -31,21 +34,9 @@ pub fn transform(s: String) -> worker::Result<String> {
                     .find(|x| x.get_uid().unwrap() == next_uid);
                 if let Some(n) = next {
                     // ustvarimo TODO
-                    let mut todo = icalendar::Todo::new();
-                    /*for prop in e.multi_properties() {
-                        todo.append_property(prop.to_owned());
-                    }*/
-                    todo.summary(&summary)
-                        .add_multi_property(
-                            "CATEGORIES",
-                            e.properties().get("CATEGORIES").unwrap().value(),
-                        )
-                        .description(e.get_description().unwrap())
-                        .starts(e.get_start().unwrap())
-                        .ends(n.get_end().unwrap())
-                        .uid(uid)
-                        .timestamp(e.get_timestamp().unwrap())
-                        .class(e.get_class().unwrap());
+                    let mut todo = event_to_todo(e);
+                    todo.ends(n.get_end().unwrap());
+                    //todo.description("cok");
                     new_calendar.push(todo);
                     consumed_uids.insert(uid.to_owned());
                     consumed_uids.insert(next_uid);
@@ -53,6 +44,7 @@ pub fn transform(s: String) -> worker::Result<String> {
             }
         }
     }
+    let mut consumed_uids2 = consumed_uids.clone();
     // in second pass we deal with the rest
     for component in calendar
         .iter()
@@ -60,28 +52,23 @@ pub fn transform(s: String) -> worker::Result<String> {
     {
         if let Some(e) = component.as_event() {
             // ustvarimo todo
-            let mut todo = icalendar::Todo::new();
-            /*for prop in e.multi_properties() {
-                todo.append_property(prop.to_owned());
-            }*/
-            todo.summary(e.get_summary().unwrap())
-                .add_multi_property(
-                    "CATEGORIES",
-                    e.properties().get("CATEGORIES").unwrap().value(),
-                )
-                .description(e.get_description().unwrap())
-                // as we have closers in second pass we set their start date to last modified
-                .starts(try_from(
-                    e.properties().get("LAST-MODIFIED").unwrap().value(),
-                )?)
-                .ends(e.get_end().unwrap())
-                .uid(e.get_uid().unwrap())
-                .timestamp(e.get_timestamp().unwrap())
-                .class(e.get_class().unwrap());
+            let mut todo = event_to_todo(e);
+            // as we have closers in second pass we set their start date to last modified
+            todo.starts(try_from(
+                e.properties().get("LAST-MODIFIED").unwrap().value(),
+            )?);
+            //todo.description("sok");
+            consumed_uids2.insert(e.get_uid().unwrap().to_owned());
             new_calendar.push(todo);
         }
     }
-
+    // for the third pass just copy all unconsumed events
+    /*for component in calendar
+        .iter()
+        .filter(|x| !consumed_uids2.contains(get_uid(x).unwrap()))
+    {
+        new_calendar.push(component.clone());
+    }*/
     Ok(new_calendar.to_string())
 }
 
@@ -99,6 +86,22 @@ fn get_uid(c: &CalendarComponent) -> Option<&str> {
     } else {
         None
     }
+}
+
+fn event_to_todo(e: &Event) -> Todo {
+    icalendar::Todo::new()
+        .summary(e.get_summary().unwrap())
+        .add_multi_property(
+            "CATEGORIES",
+            e.properties().get("CATEGORIES").unwrap().value(),
+        )
+        .description(e.get_description().unwrap())
+        .starts(e.get_start().unwrap())
+        .ends(e.get_end().unwrap())
+        .uid(e.get_uid().unwrap())
+        .timestamp(e.get_timestamp().unwrap())
+        .class(e.get_class().unwrap())
+        .done()
 }
 
 // refixed from icalendar
