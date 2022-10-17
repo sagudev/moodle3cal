@@ -36,6 +36,7 @@ pub fn transform(s: String) -> worker::Result<String> {
                     // ustvarimo TODO
                     let mut todo = event_to_todo(e);
                     todo.ends(n.get_end().unwrap());
+                    todo.due(n.get_end().unwrap());
                     //todo.description("cok");
                     new_calendar.push(todo);
                     consumed_uids.insert(uid.to_owned());
@@ -67,7 +68,8 @@ pub fn transform(s: String) -> worker::Result<String> {
         .iter()
         .filter(|x| !consumed_uids2.contains(get_uid(x).unwrap()))
     {
-        new_calendar.push(component.clone());
+        println!("{:?}", component)
+        //new_calendar.push(component.clone());
     }*/
     Ok(new_calendar.to_string())
 }
@@ -98,6 +100,7 @@ fn event_to_todo(e: &Event) -> Todo {
         .description(e.get_description().unwrap())
         .starts(e.get_start().unwrap())
         .ends(e.get_end().unwrap())
+        .due(e.get_end().unwrap())
         .uid(e.get_uid().unwrap())
         .timestamp(e.get_timestamp().unwrap())
         .class(e.get_class().unwrap())
