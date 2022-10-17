@@ -31,7 +31,7 @@ pub async fn main(req: Request, env: Env, _ctx: worker::Context) -> Result<Respo
     // Environment bindings like KV Stores, Durable Objects, Secrets, and Variables.
     router
         .get("/", |_, _| Response::ok("Hello from Workers!"))
-        .post_async("/transform/:url", |req, ctx| async move {
+        .get_async("/transform/:url", |req, ctx| async move {
             if let Some(encoded) = ctx.param("url") {
                 return Response::error(encoded, 400);
             }
