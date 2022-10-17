@@ -1,4 +1,3 @@
-use serde_json::json;
 use worker::*;
 
 mod transformer;
@@ -31,9 +30,22 @@ pub async fn main(req: Request, env: Env, _ctx: worker::Context) -> Result<Respo
     // Environment bindings like KV Stores, Durable Objects, Secrets, and Variables.
     router
         .get("/", |_, _| Response::ok("Hello from Workers!"))
-        .get_async("/transform/:url", |req, ctx| async move {
+        .get_async("/transform/:url", |_req, ctx| async move {
             if let Some(encoded) = ctx.param("url") {
-                return Response::error(encoded, 400);
+                let url = String::from_utf8(
+                    base64::decode(encoded).map_err(|e| worker::Error::RustError(e.to_string()))?,
+                )
+                .map_err(|e| worker::Error::RustError(e.to_string()))?;
+                return Response::error(url, 400);
+            }
+
+            Response::error("Bad Request", 400)
+        })
+        // https://ucilnica.fri.uni-lj.si/calendar/export_execute.php?userid=69696&authtoken=longtokendata&preset_what=all&preset_time=custom
+        .get_async("/fri", |req, _ctx| async move {
+            if let Some(q) = req.url()?.query() {
+                let url = format!("https://ucilnica.fri.uni-lj.si/calendar/export_execute.php?{q}");
+                return Response::error(url, 400);
             }
 
             Response::error("Bad Request", 400)
