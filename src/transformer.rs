@@ -1,6 +1,7 @@
+use std::collections::HashSet;
 use std::str::FromStr;
 
-use icalendar::{Calendar, Component};
+use icalendar::{Calendar, CalendarComponent, CalendarDateTime, Component, DatePerhapsTime};
 
 /*
 pozor Obseg po meri (12/10/22 – 17/10/23) ne vsebuje določenih openerjev
@@ -8,6 +9,7 @@ pozor Obseg po meri (12/10/22 – 17/10/23) ne vsebuje določenih openerjev
 pub fn transform(s: String) -> worker::Result<String> {
     let calendar = Calendar::from_str(&s).map_err(worker::Error::RustError)?;
     let mut new_calendar = Calendar::new();
+    let mut consumed_uids: HashSet<String> = HashSet::new();
 
     // copy global props (THEY ARE DOUBLED BY WRITER)
     //new_calendar.append_property(calendar.get);
@@ -33,21 +35,53 @@ pub fn transform(s: String) -> worker::Result<String> {
                     /*for prop in e.multi_properties() {
                         todo.append_property(prop.to_owned());
                     }*/
-                    todo.summary(e.get_summary().unwrap())
-                        .class(e.get_class().unwrap())
+                    todo.summary(&summary)
                         .add_multi_property(
                             "CATEGORIES",
                             e.properties().get("CATEGORIES").unwrap().value(),
                         )
-                        .uid(uid)
                         .description(e.get_description().unwrap())
                         .starts(e.get_start().unwrap())
-                        .ends(n.get_end().unwrap());
+                        .ends(n.get_end().unwrap())
+                        .uid(uid)
+                        .timestamp(e.get_timestamp().unwrap())
+                        .class(e.get_class().unwrap());
                     new_calendar.push(todo);
+                    consumed_uids.insert(uid.to_owned());
+                    consumed_uids.insert(next_uid);
                 }
             }
         }
     }
+    // in second pass we deal with the rest
+    for component in calendar
+        .iter()
+        .filter(|x| !consumed_uids.contains(get_uid(x).unwrap()))
+    {
+        if let Some(e) = component.as_event() {
+            // ustvarimo todo
+            let mut todo = icalendar::Todo::new();
+            /*for prop in e.multi_properties() {
+                todo.append_property(prop.to_owned());
+            }*/
+            todo.summary(e.get_summary().unwrap())
+                .add_multi_property(
+                    "CATEGORIES",
+                    e.properties().get("CATEGORIES").unwrap().value(),
+                )
+                .description(e.get_description().unwrap())
+                // as we have closers in second pass we set their start date to last modified
+                .starts(try_from(
+                    e.properties().get("LAST-MODIFIED").unwrap().value(),
+                )?)
+                .ends(e.get_end().unwrap())
+                .uid(e.get_uid().unwrap())
+                .timestamp(e.get_timestamp().unwrap())
+                .class(e.get_class().unwrap());
+            new_calendar.push(todo);
+        }
+    }
+
     Ok(new_calendar.to_string())
 }
 
@@ -55,6 +89,38 @@ fn next_uid(uid: &str) -> String {
     let (s1, s2) = uid.split_once('@').unwrap();
     let num: usize = s1.parse().unwrap();
     (num + 1).to_string() + "@" + s2
+}
+
+fn get_uid(c: &CalendarComponent) -> Option<&str> {
+    if let Some(e) = c.as_event() {
+        e.get_uid()
+    } else if let Some(t) = c.as_todo() {
+        t.get_uid()
+    } else {
+        None
+    }
+}
+
+// refixed from icalendar
+fn try_from(val: &str) -> Result<DatePerhapsTime, &'static str> {
+    use chrono::*;
+    // UTC is here first because lots of fields MUST be UTC, so it should,
+    // in practice, be more common that others.
+    if let Ok(utc_dt) = Utc.datetime_from_str(val, "%Y%m%dT%H%M%SZ") {
+        return Ok(DatePerhapsTime::DateTime(CalendarDateTime::Utc(utc_dt)));
+    };
+
+    if let Ok(naive_date) = NaiveDate::parse_from_str(val, "%Y%m%d") {
+        return Ok(DatePerhapsTime::Date(naive_date));
+    };
+
+    if let Ok(naive_dt) = NaiveDateTime::parse_from_str(val, "%Y%m%dT%H%M%S") {
+        return Ok(DatePerhapsTime::DateTime(CalendarDateTime::Floating(
+            naive_dt,
+        )));
+    };
+
+    Err("Value does not look like a known DATE-TIME")
 }
 
 #[test]
