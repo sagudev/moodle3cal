@@ -48,7 +48,7 @@ pub fn transform(s: String) -> worker::Result<String> {
             }
         }
     }
-    Ok(calendar.to_string())
+    Ok(new_calendar.to_string())
 }
 
 fn next_uid(uid: &str) -> String {

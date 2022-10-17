@@ -21,7 +21,10 @@ async fn fetch(url: Url) -> Result<String> {
 
 async fn response(url: Url) -> Result<Response> {
     let mut headers = Headers::new();
-    headers.set("content-type", "text/calendar")?;
+    //https://github.com/moodle/moodle/blob/master/calendar/export_execute.php
+    headers.set("Pragma", "no-cache")?;
+    headers.set("Content-disposition", "attachment; filename='calendar.ics")?;
+    headers.set("Content-type", "text/calendar; charset=utf-8")?;
 
     Ok(Response::from_body(ResponseBody::Body(
         transform(fetch(url).await?)?.into_bytes(),
