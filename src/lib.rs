@@ -31,7 +31,7 @@ async fn response(url: Url, kv: KvStore) -> Result<Response> {
     let user_id = url
         .query_pairs()
         .find_map(|(p, q)| {
-            if p == "user_id" {
+            if p == "userid" {
                 Some(q.to_string())
             } else {
                 None
