@@ -18,3 +18,7 @@ main   = "./shim.mjs"
 [[build.upload.rules]]
 globs = ["**/*.wasm"]
 type  = "CompiledWasm"
+
+kv_namespaces = [
+  { binding = "TODO", id = "0e51775881d644e9a590ecec4d6d4dff" }
+]
