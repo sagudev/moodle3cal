@@ -80,8 +80,8 @@ pub async fn main(req: Request, env: Env, _ctx: worker::Context) -> Result<Respo
 
             Response::error("Bad Request", 400)
         })
-        .put_async("/transform/:url", |req, ctx| async move {
-            console_log!("{:?}", req);
+        .put_async("/transform/:url", |mut req, ctx| async move {
+            console_log!("{:?}", req.text().await?);
             if let Some(encoded) = ctx.param("url") {
                 let url = Url::parse(
                     std::str::from_utf8(
