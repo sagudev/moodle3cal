@@ -49,7 +49,7 @@ async fn response(url: Url, kv: KvStore) -> Result<Response> {
 
 #[event(fetch)]
 pub async fn main(req: Request, env: Env, _ctx: worker::Context) -> Result<Response> {
-    log_request(&req);
+    //log_request(&req);
 
     // Optionally, get more helpful error messages written to the console in the case of a panic.
     utils::set_panic_hook();
