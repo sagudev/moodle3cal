@@ -80,6 +80,23 @@ pub async fn main(req: Request, env: Env, _ctx: worker::Context) -> Result<Respo
 
             Response::error("Bad Request", 400)
         })
+        .post_async("/transform/:url", |req, ctx| async move {
+            console_log!("{:?}", req);
+            if let Some(encoded) = ctx.param("url") {
+                let url = Url::parse(
+                    std::str::from_utf8(
+                        &base64::decode(encoded)
+                            .map_err(|e| worker::Error::RustError(e.to_string()))?,
+                    )
+                    .map_err(|e| worker::Error::RustError(e.to_string()))?,
+                )?;
+
+                let kv = ctx.kv("TODO")?;
+                return response(url, kv).await;
+            }
+
+            Response::error("Bad Request", 400)
+        })
         // https://ucilnica.fri.uni-lj.si/calendar/export_execute.php?userid=69696&authtoken=longtokendata&preset_what=all&preset_time=custom
         .get_async("/fri", |req, ctx| async move {
             if let Some(q) = req.url()?.query() {
