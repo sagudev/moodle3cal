@@ -8,7 +8,7 @@ use icalendar::{
 /*
 pozor Obseg po meri (12/10/22 – 17/10/23) ne vsebuje določenih openerjev
 */
-pub fn transform(s: String) -> worker::Result<String> {
+pub fn transform(s: String) -> worker::Result<Calendar> {
     let calendar = Calendar::from_str(&s).map_err(worker::Error::RustError)?;
     let mut new_calendar = Calendar::new();
     let mut consumed_uids: HashSet<String> = HashSet::new();
@@ -70,7 +70,7 @@ pub fn transform(s: String) -> worker::Result<String> {
         println!("{:?}", component)
         //new_calendar.push(component.clone());
     }*/
-    Ok(new_calendar.to_string())
+    Ok(new_calendar)
 }
 
 fn next_uid(uid: &str) -> String {

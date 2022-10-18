@@ -1,7 +1,9 @@
 use transformer::transform;
 
+use worker::kv::KvStore;
 use worker::*;
 
+mod state;
 mod transformer;
 mod utils;
 
@@ -19,15 +21,28 @@ async fn fetch(url: Url) -> Result<String> {
     Fetch::Url(url).send().await?.text().await
 }
 
-async fn response(url: Url) -> Result<Response> {
+async fn response(url: Url, kv: KvStore) -> Result<Response> {
     let mut headers = Headers::new();
     //https://github.com/moodle/moodle/blob/master/calendar/export_execute.php
     headers.set("Pragma", "no-cache")?;
     headers.set("Content-disposition", "attachment; filename=calendar.ics")?;
     headers.set("Content-type", "text/calendar; charset=utf-8")?;
 
+    let user_id = url
+        .query_pairs()
+        .find_map(|(p, q)| {
+            if p == "user_id" {
+                Some(q.to_string())
+            } else {
+                None
+            }
+        })
+        .unwrap();
     Ok(Response::from_body(ResponseBody::Body(
-        transform(fetch(url).await?)?.into_bytes(),
+        state::compute_state(transform(fetch(url).await?)?, &user_id, kv)
+            .await?
+            .to_string()
+            .into_bytes(),
     ))?
     .with_headers(headers))
 }
@@ -59,19 +74,21 @@ pub async fn main(req: Request, env: Env, _ctx: worker::Context) -> Result<Respo
                     .map_err(|e| worker::Error::RustError(e.to_string()))?,
                 )?;
 
-                return response(url).await;
+                let kv = ctx.kv("TODO")?;
+                return response(url, kv).await;
             }
 
             Response::error("Bad Request", 400)
         })
         // https://ucilnica.fri.uni-lj.si/calendar/export_execute.php?userid=69696&authtoken=longtokendata&preset_what=all&preset_time=custom
-        .get_async("/fri", |req, _ctx| async move {
+        .get_async("/fri", |req, ctx| async move {
             if let Some(q) = req.url()?.query() {
                 let url = Url::parse(&format!(
                     "https://ucilnica.fri.uni-lj.si/calendar/export_execute.php?{q}"
                 ))?;
 
-                return response(url).await;
+                let kv = ctx.kv("TODO")?;
+                return response(url, kv).await;
             }
 
             Response::error("Bad Request", 400)
