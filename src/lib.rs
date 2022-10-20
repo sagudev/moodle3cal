@@ -1,3 +1,7 @@
+use std::str::FromStr;
+
+use icalendar::Calendar;
+use state::set_state;
 use transformer::transform;
 
 use worker::kv::KvStore;
@@ -47,6 +51,22 @@ async fn response(url: Url, kv: KvStore) -> Result<Response> {
     .with_headers(headers))
 }
 
+async fn update_state(req: &mut Request, url: &Url, kv: &KvStore) -> Result<()> {
+    let calendar = Calendar::from_str(&req.text().await?).map_err(worker::Error::RustError)?;
+    let user_id = url
+        .query_pairs()
+        .find_map(|(p, q)| {
+            if p == "userid" {
+                Some(q.to_string())
+            } else {
+                None
+            }
+        })
+        .unwrap();
+    set_state(calendar, &user_id, kv).await?;
+    Ok(())
+}
+
 #[event(fetch)]
 pub async fn main(req: Request, env: Env, _ctx: worker::Context) -> Result<Response> {
     //log_request(&req);
@@ -81,7 +101,8 @@ pub async fn main(req: Request, env: Env, _ctx: worker::Context) -> Result<Respo
             Response::error("Bad Request", 400)
         })
         .put_async("/transform/:url", |mut req, ctx| async move {
-            console_log!("{:?}", req.text().await?);
+            // console_log!("{:?}", req.text().await?);
+            // in body we have full flagdged file
             if let Some(encoded) = ctx.param("url") {
                 let url = Url::parse(
                     std::str::from_utf8(
@@ -92,6 +113,7 @@ pub async fn main(req: Request, env: Env, _ctx: worker::Context) -> Result<Respo
                 )?;
 
                 let kv = ctx.kv("TODO")?;
+                update_state(&mut req, &url, &kv).await?;
                 return response(url, kv).await;
             }
 
