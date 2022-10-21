@@ -24,14 +24,17 @@ pub async fn set_state(calendar: Calendar, user_id: &str, kv: &KvStore) -> worke
     for component in calendar.iter() {
         if let CalendarComponent::Todo(t) = component {
             let uid = t.get_uid().unwrap();
-            kv.put(
-                &(user_id.to_owned() + uid),
-                t.get_completed().unwrap().to_string()
-                    + ";"
-                    + &t.get_percent_complete().unwrap().to_string(),
-            )?
-            .execute()
-            .await?;
+            // there is now completed field if its not completed
+            if let Some(completed) = t.get_completed() {
+                kv.put(
+                    &(user_id.to_owned() + uid),
+                    completed.to_string()
+                        + ";"
+                        + &t.get_percent_complete().unwrap_or(0).to_string(),
+                )?
+                .execute()
+                .await?;
+            }
         }
     }
     //kv.put("key", "value")?.execute().await?;
