@@ -20,6 +20,8 @@ pub async fn compute_state(
     Ok(calendar)
 }
 
+// in body we have full flagged file
+// TODO: TB calendar in offline mode
 pub async fn set_state(calendar: Calendar, user_id: &str, kv: &KvStore) -> worker::Result<()> {
     for component in calendar.iter() {
         if let CalendarComponent::Todo(t) = component {

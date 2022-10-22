@@ -101,8 +101,6 @@ pub async fn main(req: Request, env: Env, _ctx: worker::Context) -> Result<Respo
             Response::error("Bad Request", 400)
         })
         .put_async("/transform/:url", |mut req, ctx| async move {
-            // console_log!("{:?}", req.text().await?);
-            // in body we have full flagdged file
             if let Some(encoded) = ctx.param("url") {
                 let url = Url::parse(
                     std::str::from_utf8(
@@ -127,6 +125,19 @@ pub async fn main(req: Request, env: Env, _ctx: worker::Context) -> Result<Respo
                 ))?;
 
                 let kv = ctx.kv("TODO")?;
+                return response(url, kv).await;
+            }
+
+            Response::error("Bad Request", 400)
+        })
+        .put_async("/fri", |mut req, ctx| async move {
+            if let Some(q) = req.url()?.query() {
+                let url = Url::parse(&format!(
+                    "https://ucilnica.fri.uni-lj.si/calendar/export_execute.php?{q}"
+                ))?;
+
+                let kv = ctx.kv("TODO")?;
+                update_state(&mut req, &url, &kv).await?;
                 return response(url, kv).await;
             }
 
