@@ -188,8 +188,9 @@ pub async fn main(req: Request, env: Env, _ctx: worker::Context) -> Result<Respo
             headers.set("Content-type", "text/calendar; charset=utf-8")?;
 
             Ok(Response::from_body(ResponseBody::Body(
-                    state::compute_state(transform(calendar)?, &user_id, kv)
-                        .await?
+                    //state::compute_state(transform(calendar)?, &user_id, kv)
+                        //.await?
+                        calendar
                         .to_string()
                         .into_bytes(),
                 ))?
