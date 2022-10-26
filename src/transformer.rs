@@ -4,6 +4,65 @@ use icalendar::{
     Calendar, CalendarComponent, CalendarDateTime, Component, DatePerhapsTime, Event, Todo,
 };
 
+/// Find next id of event
+///
+/// This is mostly useful for finding closer if you know opener id as closers have next id
+fn next_uid(uid: &str) -> String {
+    let (s1, s2) = uid.split_once('@').unwrap();
+    let num: usize = s1.parse().unwrap();
+    (num + 1).to_string() + "@" + s2
+}
+
+/// Get uid of ether of event or todo component
+fn get_uid(c: &CalendarComponent) -> Option<&str> {
+    if let Some(e) = c.as_event() {
+        e.get_uid()
+    } else if let Some(t) = c.as_todo() {
+        t.get_uid()
+    } else {
+        None
+    }
+}
+
+fn event_to_todo(e: &Event) -> Todo {
+    icalendar::Todo::new()
+        .summary(e.get_summary().unwrap())
+        .add_multi_property(
+            "CATEGORIES",
+            e.properties().get("CATEGORIES").unwrap().value(),
+        )
+        .description(e.get_description().unwrap())
+        .starts(e.get_start().unwrap())
+        .ends(e.get_end().unwrap())
+        .due(e.get_end().unwrap())
+        .uid(e.get_uid().unwrap())
+        .timestamp(e.get_timestamp().unwrap())
+        .class(e.get_class().unwrap())
+        .done()
+}
+
+// refixed from icalendar
+fn try_from(val: &str) -> Result<DatePerhapsTime, &'static str> {
+    use chrono::*;
+    // UTC is here first because lots of fields MUST be UTC, so it should,
+    // in practice, be more common that others.
+    if let Ok(utc_dt) = Utc.datetime_from_str(val, "%Y%m%dT%H%M%SZ") {
+        return Ok(DatePerhapsTime::DateTime(CalendarDateTime::Utc(utc_dt)));
+    };
+
+    if let Ok(naive_date) = NaiveDate::parse_from_str(val, "%Y%m%d") {
+        return Ok(DatePerhapsTime::Date(naive_date));
+    };
+
+    if let Ok(naive_dt) = NaiveDateTime::parse_from_str(val, "%Y%m%dT%H%M%S") {
+        return Ok(DatePerhapsTime::DateTime(CalendarDateTime::Floating(
+            naive_dt,
+        )));
+    };
+
+    Err("Value does not look like a known DATE-TIME")
+}
+
 /*
 pozor Obseg po meri (12/10/22 – 17/10/23) ne vsebuje določenih openerjev
 */
@@ -69,65 +128,6 @@ pub fn transform(calendar: Calendar) -> worker::Result<Calendar> {
     Ok(new_calendar)
 }
 
-/// Find next id of event
-///
-/// This is mostly useful for finding closer if you know opener id as closers have next id
-fn next_uid(uid: &str) -> String {
-    let (s1, s2) = uid.split_once('@').unwrap();
-    let num: usize = s1.parse().unwrap();
-    (num + 1).to_string() + "@" + s2
-}
-
-/// Get uid of ether of event or todo component
-fn get_uid(c: &CalendarComponent) -> Option<&str> {
-    if let Some(e) = c.as_event() {
-        e.get_uid()
-    } else if let Some(t) = c.as_todo() {
-        t.get_uid()
-    } else {
-        None
-    }
-}
-
-fn event_to_todo(e: &Event) -> Todo {
-    icalendar::Todo::new()
-        .summary(e.get_summary().unwrap())
-        .add_multi_property(
-            "CATEGORIES",
-            e.properties().get("CATEGORIES").unwrap().value(),
-        )
-        .description(e.get_description().unwrap())
-        .starts(e.get_start().unwrap())
-        .ends(e.get_end().unwrap())
-        .due(e.get_end().unwrap())
-        .uid(e.get_uid().unwrap())
-        .timestamp(e.get_timestamp().unwrap())
-        .class(e.get_class().unwrap())
-        .done()
-}
-
-// refixed from icalendar
-fn try_from(val: &str) -> Result<DatePerhapsTime, &'static str> {
-    use chrono::*;
-    // UTC is here first because lots of fields MUST be UTC, so it should,
-    // in practice, be more common that others.
-    if let Ok(utc_dt) = Utc.datetime_from_str(val, "%Y%m%dT%H%M%SZ") {
-        return Ok(DatePerhapsTime::DateTime(CalendarDateTime::Utc(utc_dt)));
-    };
-
-    if let Ok(naive_date) = NaiveDate::parse_from_str(val, "%Y%m%d") {
-        return Ok(DatePerhapsTime::Date(naive_date));
-    };
-
-    if let Ok(naive_dt) = NaiveDateTime::parse_from_str(val, "%Y%m%dT%H%M%S") {
-        return Ok(DatePerhapsTime::DateTime(CalendarDateTime::Floating(
-            naive_dt,
-        )));
-    };
-
-    Err("Value does not look like a known DATE-TIME")
-}
-
 #[test]
 fn test_file() {
     let s = std::fs::read_to_string("./private/file.ics").unwrap();
@@ -143,4 +143,14 @@ pub fn merge(mut cal1: Calendar, cal2: Calendar) -> worker::Result<Calendar> {
     }
 
     Ok(cal1)
+}
+
+#[test]
+fn test_merge() {
+    let cal1 = std::fs::read_to_string("./private/custom.ics").unwrap();
+    let cal1 = crate::parse_calendar(&cal1).unwrap();
+    let cal2 = std::fs::read_to_string("./private/monthnow.ics").unwrap();
+    let cal2 = crate::parse_calendar(&cal2).unwrap();
+    println!("{}", merge(cal1, cal2).unwrap());
+    //transform(s).unwrap();
 }
