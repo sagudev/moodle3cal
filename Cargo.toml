@@ -13,6 +13,7 @@ default = ["console_error_panic_hook"]
 cfg-if = "1.0.0"
 worker = "0.0.11"
 #serde_json = "1.0"
+# next two are used for transformer
 icalendar = { version = "0.13", features = ["parser"] }
 chrono = "0.4"
 base64 = "0.13"

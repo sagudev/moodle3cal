@@ -7,6 +7,7 @@ use transformer::transform;
 use worker::kv::KvStore;
 use worker::*;
 
+mod durable;
 mod state;
 mod transformer;
 mod utils;
@@ -222,6 +223,41 @@ pub async fn main(req: Request, env: Env, _ctx: worker::Context) -> Result<Respo
             Ok(Response::from_body(ResponseBody::Body(
                     state::compute_state(transform(calendar)?, &user_id, kv)
                         .await?
+                        .to_string()
+                        .into_bytes(),
+                ))?
+                .with_headers(headers))
+        })
+        // fri2 endpoints or as what i call it friz
+        // it should get username and password
+        // so make sure we are using https
+        .post_async("/friz", |req, ctx| async move {
+            //req.url()?.set_password(password);
+            // get params
+            let (user_id, auth_token, present_what) = get_params(&req)?;
+            // fetch and merge
+            let calendar = transformer::merge(
+                fetch_calendar(Url::parse(&format!(
+                    "https://ucilnica.fri.uni-lj.si/calendar/export_execute.php?userid={user_id}&authtoken={auth_token}&preset_what={present_what}&preset_time=custom"
+                ))?)
+                .await?,
+                fetch_calendar(Url::parse(&format!(
+                    "https://ucilnica.fri.uni-lj.si/calendar/export_execute.php?userid={user_id}&authtoken={auth_token}&preset_what={present_what}&preset_time=monthnow"
+                ))?)
+                .await?,
+            )?;
+            // get kv store
+            let kv = ctx.kv("TODO")?;
+            let mut headers = Headers::new();
+            //https://github.com/moodle/moodle/blob/master/calendar/export_execute.php
+            headers.set("Pragma", "no-cache")?;
+            headers.set("Content-disposition", "attachment; filename=calendar.ics")?;
+            headers.set("Content-type", "text/calendar; charset=utf-8")?;
+
+            Ok(Response::from_body(ResponseBody::Body(
+                    //state::compute_state(transform(calendar)?, &user_id, kv)
+                        //.await?
+                        calendar
                         .to_string()
                         .into_bytes(),
                 ))?
