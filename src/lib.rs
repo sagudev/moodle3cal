@@ -7,7 +7,7 @@ use transformer::transform;
 use worker::kv::KvStore;
 use worker::*;
 
-mod durable;
+//mod durable;
 mod state;
 mod transformer;
 mod utils;
@@ -231,7 +231,7 @@ pub async fn main(req: Request, env: Env, _ctx: worker::Context) -> Result<Respo
         // fri2 endpoints or as what i call it friz
         // it should get username and password
         // so make sure we are using https
-        .post_async("/friz", |req, ctx| async move {
+        /*.post_async("/friz", |req, ctx| async move {
             //req.url()?.set_password(password);
             // get params
             let (user_id, auth_token, present_what) = get_params(&req)?;
@@ -262,7 +262,7 @@ pub async fn main(req: Request, env: Env, _ctx: worker::Context) -> Result<Respo
                         .into_bytes(),
                 ))?
                 .with_headers(headers))
-        })
+        })*/
         .get("/worker-version", |_, ctx| {
             let version = ctx.var("WORKERS_RS_VERSION")?.to_string();
             Response::ok(version)
